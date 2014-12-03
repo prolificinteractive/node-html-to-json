@@ -131,3 +131,15 @@ describe('array filter', function () {
     });
   });
 });
+
+describe('passed data parameter', function () {
+  it('is passed into filter function', function (done) {
+    parse('', function ($doc, $, data) {
+      data.val.should.equal(1);
+      this.data.val.should.equal(1);
+      done();
+    }, {
+      val: 1
+    });
+  });
+});
