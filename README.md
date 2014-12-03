@@ -6,9 +6,9 @@ Parses HTML strings into objects using flexible, composable filters.
 
 `npm install htmlToJson`
 
-## htmlToJson.parse()
+## htmlToJson.parse(html, filter, [data], [callback])
 
-The `parse()` method takes a string of HTML, a filter, and returns the filtered data.
+The `parse()` method takes a string of HTML, a filter, optional data, and responds with the filtered data. This supports both callbacks and promises.
 
 ```javascript
 var promise = htmlToJson.parse('<div>content</div>', {
@@ -18,9 +18,13 @@ var promise = htmlToJson.parse('<div>content</div>', {
 }, function (err, result) {
   console.log(result);
 });
+
+promise.done(function (result) {
+  //Works as well
+});
 ```
 
-## htmlToJson.request()
+## htmlToJson.request(requestOptions, filter, [data], [callback])
 
 The `request()` method takes options for a call to the [request](https://github.com/request/request) library and a filter, then returns the filtered response body.
 
@@ -41,14 +45,14 @@ var promise = htmlToJson.request('http://prolificinteractive.com/team', {
 The return values of functions are mapped against their corresponding keys. Function filters are passed [cheerio](https://github.com/cheeriojs/cheerio) objects, which allows you to play with a jQuery-like interface.
 
 ```javascript
-htmlToJson.parse('<div id="foo">foo</div>', { bar: 'bar' }, {
+htmlToJson.parse('<div id="foo">foo</div>', {
   'foo1': function ($doc, $, data) {
     return $doc.find('#foo').text() + data.bar; //foobar
   },
   'foo2': function () {
     return this.$('#foo').text() + this.data.bar; //foobar, using context instead
   }
-});
+}, { bar: 'bar' });
 ```
 
 ### Arrays
