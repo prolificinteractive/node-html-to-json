@@ -69,6 +69,20 @@ describe('object filter', function () {
       done();
     });
   });
+
+  describe('$container modifier', function () {
+    it('sets the DOM context to elements matched by $container selector', function (done) {
+      parse(simpleMarkup, {
+        $container: '.bar',
+        'id': function ($el) {
+          return $el.attr('class');
+        }
+      }, function (err, result) {
+        result.id.should.equal('bar');
+        done();
+      });
+    });
+  });
 });
 
 describe('filter context methods', function () {
