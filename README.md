@@ -4,7 +4,7 @@ Parses HTML strings into objects using flexible, composable filters.
 
 ## Installation
 
-`npm install htmlToJson`
+`npm install html-to-json`
 
 ## htmlToJson.parse(html, filter, [data], [callback])
 
