@@ -9,9 +9,9 @@
   "author": "Eric Weber <eric@prolificinteractive.com",
   "license": "MIT",
   "dependencies": {
+    "bluebird": "^2.9.25",
     "cheerio": "^0.18.0",
     "lodash": "^2.4.1",
-    "q": "^1.1.1",
     "request": "^2.49.0"
   },
   "repository": {
