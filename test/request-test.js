@@ -2,7 +2,7 @@ var http = require('http');
 var express = require('express');
 var htmlToJson = require('../lib/htmlToJson');
 
-describe('method', function () {
+describe('htmlToJson.request', function () {
   it('should take request library options and a filter, then return parsed results based on the response body', function (done) {
     var app = express();
     var server = http.createServer(app);
