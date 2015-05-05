@@ -6,9 +6,9 @@ Parses HTML strings into objects using flexible, composable filters.
 
 `npm install html-to-json`
 
-## htmlToJson.parse(html, filter, [data], [callback])
+## htmlToJson.parse(html, filter, [callback])
 
-The `parse()` method takes a string of HTML, a filter, optional data, and responds with the filtered data. This supports both callbacks and promises.
+The `parse()` method takes a string of HTML, and a filter, and responds with the filtered data. This supports both callbacks and promises.
 
 ```javascript
 var promise = htmlToJson.parse('<div>content</div>', {
@@ -24,7 +24,7 @@ promise.done(function (result) {
 });
 ```
 
-## htmlToJson.request(requestOptions, filter, [data], [callback])
+## htmlToJson.request(requestOptions, filter, [callback])
 
 The `request()` method takes options for a call to the [request](https://github.com/request/request) library and a filter, then returns the filtered response body.
 
@@ -46,13 +46,10 @@ The return values of functions are mapped against their corresponding keys. Func
 
 ```javascript
 htmlToJson.parse('<div id="foo">foo</div>', {
-  'foo1': function ($doc, $, data) {
-    return $doc.find('#foo').text() + data.bar; //foobar
-  },
-  'foo2': function () {
-    return this.$('#foo').text() + this.data.bar; //foobar, using context instead
+  'foo1': function ($doc, $) {
+    return $doc.find('#foo').text(); //foo
   }
-}, { bar: 'bar' });
+}, callback);
 ```
 
 ### Arrays
@@ -202,6 +199,50 @@ htmlToJson.parse('<div id="nada"></div>', {
   z: null
 });
 ```
+
+## htmlToJson.createParser(filter), new htmlToJson.Parser(filter)
+
+For the sake of reusability, creates an object with `.parse` and `.request` helper methods, which use the passed filter. For example:
+
+```javascript
+var linkParser = htmlToJson.parser(['a[href]', {
+  'text': function ($a) {
+    return $a.text();
+  },
+  'href': function ($a) {
+    return $a.attr('href');
+  }
+}]);
+
+linkParser.request('http://prolificinteractive.com').done(function (links) {
+  //Do stuff with links
+});
+```
+
+is equivalent to:
+
+```javascript
+linkParser.request('http://prolificinteractive.com', ['a[href]', {
+  'text': function ($a) {
+    return $a.text();
+  },
+  'href': function ($a) {
+    return $a.attr('href');
+  }
+}]).done(function (links) {
+  //Do stuff with links
+});
+```
+
+The former allows you to easily reuse the filter (and make it testable), while that latter is a one-off.
+
+### parser.parse(html, [callback])
+
+Parses the passed html argument against the parser's filter.
+
+### parser.request(requestOptions, [callback])
+
+Makes a request with the request options, then runs the response body through the parser's filter.
 
 ## Contributing
 
