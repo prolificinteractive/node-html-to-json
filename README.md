@@ -74,7 +74,7 @@ htmlToJson.parse(html, function () {
 });
 ````
 
-#### [selector, filter]
+#### [selector, filter, after]
 
 This is essentially a short-hand alias for `.map()`, making the filter look more like its output:
 
@@ -85,6 +85,24 @@ htmlToJson.parse(html, ['.item', function ($item) {
   return $item.text();
 }]).done(function (items) {
   // Items should be: ['1','2']
+}, function (err) {
+  // Handle error
+});
+```
+
+As an added convenience you can pass in a 3rd argument into the array filter, which allows you to manipulate the results. You can return a promise if you wish to do an asynchronous operation.
+
+```javascript
+var html = '<div id="items"><div clas="item">1</div><div clas="item">2</div></div>';
+
+htmlToJson.parse(html, ['.item', function ($item) {
+  return +$item.text();
+}, function (items) {
+  return _.map(items, function (item) {
+    return item * 3;
+  });
+}]).done(function (items) {
+  // Items should be: [3,6]
 }, function (err) {
   // Handle error
 });

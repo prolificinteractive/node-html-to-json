@@ -1,3 +1,4 @@
+var _ = require('lodash');
 var Promise = require('bluebird');
 var parse = require('../lib/parse');
 var simpleMarkup = '<div class="foo">1</div><div class="bar">2</div>';
@@ -45,27 +46,25 @@ describe('htmlToJson.parse', function () {
   });
 
   describe('object filter', function () {
-    it('iterates through each key and recursively uses the values as filters', function (done) {
-      parse(simpleMarkup, {
+    it('iterates through each key and recursively uses the values as filters', function () {
+      return parse(simpleMarkup, {
         x: 1,
         y: 2
-      }, function (err, result) {
+      }).tap(function (result) {
         result.x.should.equal(1);
         result.y.should.equal(2);
-        done();
       });
     });
 
     describe('$container modifier', function () {
-      it('sets the DOM context to elements matched by $container selector', function (done) {
-        parse(simpleMarkup, {
+      it('sets the DOM context to elements matched by $container selector', function () {
+        return parse(simpleMarkup, {
           $container: '.bar',
           'id': function ($el) {
             return $el.attr('class');
           }
-        }, function (err, result) {
+        }).tap(function (result) {
           result.id.should.equal('bar');
-          done();
         });
       });
     });
@@ -73,21 +72,20 @@ describe('htmlToJson.parse', function () {
 
   describe('filter context methods', function () {
     describe('.Promise(fn)', function () {
-      it('takes a promise container function and returns a promise', function (done) {
-        parse('', function () {
+      it('takes a promise container function and returns a promise', function () {
+        return parse('', function () {
           return this.Promise(function (resolve) {
             resolve(1);
           });
-        }, function (err, result) {
+        }).tap(function (result) {
           result.should.equal(1);
-          done();
         });
       });
     });
 
     describe('.get(property)', function () {
-      it('returns a promise that is resolved whenever the given property is resolved', function (done) {
-        parse('', {
+      it('returns a promise that is resolved whenever the given property is resolved', function () {
+        return parse('', {
           'x': function () {
             return this.Promise(function (resolve) {
               resolve('foo');
@@ -98,36 +96,48 @@ describe('htmlToJson.parse', function () {
               return x + 'bar';
             });
           }
-        }, function (err, result) {
+        }).tap(function (result) {
           result.y.should.equal('foobar');
-          done();
         });
       });
     });
 
     describe('.map(selector, filter)', function () {
-      it('returns an array of results from applying the filter to each selected element', function (done) {
-        parse(simpleMarkup, function () {
+      it('returns an array of results from applying the filter to each selected element', function () {
+        return parse(simpleMarkup, function () {
           return this.map('*', function ($el) {
             return $el.text();
           });
-        }, function (err, result) {
+        }).tap(function (result) {
           result[0].should.equal('1');
           result[1].should.equal('2');
-          done();
         });
       });
     });
   });
 
   describe('array filter', function () {
-    it('acts as a shorthand to applying the .map() method within a function filter', function (done) {
-      parse(simpleMarkup, ['*', function ($el) {
+    it('acts as a shorthand to applying the .map() method within a function filter', function () {
+      return parse(simpleMarkup, ['*', function ($el) {
         return $el.text();
-      }], function (err, result) {
+      }]).tap(function (result) {
         result[0].should.equal('1');
         result[1].should.equal('2');
-        done();
+      });
+    });
+
+    it('allows passing a 3rd argument in the array, which is applied as a filter post parsing', function () {
+      return parse(simpleMarkup, ['*', function ($el) {
+        return $el.text();
+      }, function (items) {
+        return _.filter(items, function (item) {
+          if (item === '2') {
+            return true;
+          }
+        });
+      }]).tap(function (result) {
+        result.length.should.equal(1);
+        result[0].should.equal('2');
       });
     });
   });
