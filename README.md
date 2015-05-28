@@ -258,6 +258,10 @@ The former allows you to easily reuse the filter (and make it testable), while t
 
 Parses the passed html argument against the parser's filter.
 
+### parser.method(html, [callback])
+
+Returns a method that wraps `parser.parse()`
+
 ### parser.request(requestOptions, [callback])
 
 Makes a request with the request options, then runs the response body through the parser's filter.
