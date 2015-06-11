@@ -14,10 +14,21 @@ describe('htmlToJson.parse', function () {
 
   describe('function filter', function () {
     it('assigns the return of the function to the result value', function () {
-      return parse(simpleMarkup, function () {
-        return 1;
-      }).tap(function (result) {
-        result.should.equal(1);
+      return parse(simpleMarkup, ['div', {
+        'className': function ($div) {
+          return $div.attr('class');
+        },
+        'text': function ($div) {
+          return $div.text().trim();
+        },
+        'classAndText': function () {
+          return Promise.join(this.get('className'), this.get('text'), function (className, text) {
+            return className + text;
+          });
+        }
+      }]).tap(function (results) {
+        results[0].classAndText.should.equal('foo1');
+        results[1].classAndText.should.equal('bar2');
       });
     });
 
@@ -71,25 +82,11 @@ describe('htmlToJson.parse', function () {
   });
 
   describe('filter context methods', function () {
-    describe('.Promise(fn)', function () {
-      it('takes a promise container function and returns a promise', function () {
-        return parse('', function () {
-          return this.Promise(function (resolve) {
-            resolve(1);
-          });
-        }).tap(function (result) {
-          result.should.equal(1);
-        });
-      });
-    });
-
     describe('.get(property)', function () {
       it('returns a promise that is resolved whenever the given property is resolved', function () {
         return parse('', {
           'x': function () {
-            return this.Promise(function (resolve) {
-              resolve('foo');
-            });
+            return Promise.resolve('foo');
           },
           'y': function () {
             return this.get('x').then(function (x) {
