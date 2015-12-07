@@ -326,22 +326,14 @@ htmlToJson.parse('<div id="nada"></div>', {
 
 ## Contributing
 
-First make sure you have the grunt command line installed globally:
-
-`sudo npm install -g grunt-cli`
-
 ### Running Tests
 
-Tests are written in mocha and located in the `test` directory. Run them with grunt:
+Tests are written in mocha and located in the `test` directory. Run them with:
 
-`grunt test`
+`npm test`
 
-### Code Standards
+This script also executes `jshint` against `lib/` and `test/` directories.
 
-#### Linting
+### Style
 
-Before committing, run `grunt lint` and fix any warnings.
-
-#### Style
-
-Before committing, make sure to run `grunt beautify`.
+Please read the existing code in order to learn the conventions.
