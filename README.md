@@ -92,7 +92,7 @@ var parseFoo = htmlToJson.createMethod({
 For the sake of reusability, creates an object with `.parse` and `.request` helper methods, which use the passed filter. For example:
 
 ```javascript
-var linkParser = htmlToJson.parser(['a[href]', {
+var linkParser = htmlToJson.createParser(['a[href]', {
   'text': function ($a) {
     return $a.text();
   },
