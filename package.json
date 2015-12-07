@@ -1,6 +1,6 @@
 {
   "name": "html-to-json",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Parses HTML strings into objects using flexible, composable filters.",
   "main": "index.js",
   "scripts": {
