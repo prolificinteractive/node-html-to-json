@@ -1,4 +1,4 @@
-# htmlToJson
+![HTML to JSON](html-to-json.jpg)
 
 Parses HTML strings into objects using flexible, composable filters.
 
