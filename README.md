@@ -1,4 +1,4 @@
-# html-to-json
+![html-to-json](html-to-json.jpg)
 
 Concise HTML data parsing, built on top of `cheerio`.
 
