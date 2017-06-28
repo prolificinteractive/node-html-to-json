@@ -1,339 +1,281 @@
-# htmlToJson
+# html-to-json
 
-Parses HTML strings into objects using flexible, composable filters.
+Concise HTML data parsing, built on top of `cheerio`.
 
 ## Installation
 
-`npm install html-to-json`
+```
+npm install html-to-json --save
+```
 
-## htmlToJson.parse(html, filter, [callback]) -> promise
+## Introduction
 
-The `parse()` method takes a string of HTML, and a filter, and responds with the filtered data. This supports both callbacks and promises.
+After `cheerio` came along, parsing data from HTML on the server (aka scraping) became a much easier task. `html-to-json` takes it one step further by allowing you to construct parsing functions that take on the same shape of the data they produce.
+
+For instance:
 
 ```javascript
-var promise = htmlToJson.parse('<div>content</div>', {
-  'text': function ($doc) {
-    return $doc.find('div').text();
-  }
-}, function (err, result) {
-  console.log(result);
-});
-
-promise.done(function (result) {
-  //Works as well
+const parseSearchPage = html => parse(html, {
+  'relatedCategories': ['nav .category', $c => $c.text()],
+  'products': ['.product', $p => ({
+    'id': $p.attr('data-id'),
+    'name': $p.find('.product-name').text().trim(),
+    'url': $p.find('a').attr('href'),
+    'images': ['img[data-lazy-url]', $i => $i.attr('data-lazy-url')]
+  })]
 });
 ```
 
-## htmlToJson.request(requestOptions, filter, [callback]) -> promise
-
-The `request()` method takes options for a call to the [request](https://github.com/request/request) library and a filter, then returns the filtered response body.
+Versus...
 
 ```javascript
-var promise = htmlToJson.request('http://prolificinteractive.com/team', {
-  'images': ['img', function ($img) {
-    return $img.attr('src');
-  }]
-}, function (err, result) {
-  console.log(result);
-});
-```
+const parseSearchPage = html => {
+  const $ = cheerio.load(html);
 
-## htmlToJson.batch(html, dictionary, [callback]) -> promise
-
-Performs many parsing operations against one HTML string. This transforms the HTML into a DOM only once instead of for each filter in the dictionary, which can quickly get expensive in terms of processing. This also allows you to break your filters up into more granular components and mix and match them as you please.
-
-The values in the dictionary can be `htmlToJson.Parser` objects, generated methods from `htmlToJson.createMethod`, or naked filters that you might normally pass into `htmlToJson.parse`. For example:
-
-```javascript
-return getProlificHomepage().then(function (html) {
-  return htmlToJson.batch(html, {
-    sections: htmlToJson.createParser(['#primary-nav a', {
-      'name': function ($section) {
-        return $section.text();
-      },
-      'link': function ($section) {
-        return $section.attr('href');
-      }
-    }]),
-    offices: htmlToJson.createMethod(['.office', {
-      'location': function ($office) {
-        return $office.find('.location').text();
-      },
-      'phone': function ($office) {
-        return $office.find('.phone').text();
-      }
-    }]),
-    socialInfo: ['#footer .social-link', {
-      'name': function ($link) {
-        return $link.text();
-      },
-      'link': function ($link) {
-        return $link.attr('href');
-      }
-    }]
+  const relatedCategories = $('nav .category').map((i, c) => {
+    return $(c).text();
   });
-});
+
+  const products = $('.product').map((i, p) => {
+    const $p = $(p);
+    return {
+      'id': $p.attr('data-id'),
+      'name': $p.find('.product-name').text().trim(),
+      'url': $p.find('a').attr('href'),
+      'images': $p.find('img[data-lazy-url]').map((i, img) => {
+        return $(img).attr('data-lazy-url');
+      })
+    };
+  });
+
+  return {
+    relatedCategories,
+    products
+  };
+};
 ```
 
-## htmlToJson.createMethod(filter) -> function (html, [callback])
+## Usage
 
-Generates a method that wraps the passed `filter` argument. The generated method takes an HTML string and processes it against that `filter`.
+### Synchronous Parsing
 
-```javascript
-var parseFoo = htmlToJson.createMethod({
-  'foo': function ($doc) {
-    return $doc.find('#foo').bar();
-  }
-});
-```
-
-## htmlToJson.createParser(filter), new htmlToJson.Parser(filter)
-
-For the sake of reusability, creates an object with `.parse` and `.request` helper methods, which use the passed filter. For example:
+By default, parsers are synchronous:
 
 ```javascript
-var linkParser = htmlToJson.createParser(['a[href]', {
-  'text': function ($a) {
-    return $a.text();
-  },
-  'href': function ($a) {
-    return $a.attr('href');
-  }
+'use strict';
+
+const bluebird = require('bluebird');
+const requestAsync = bluebird.promisify(require('request'));
+const { parse } = require('html-to-json');
+
+const parseCartItems = html => parse(html, ['#cart li', {
+  'id': $li => $li.attr('data-id'),
+  'name': $li => $li.find('.name').text(),
+  'quantity': $li => +$li.find('.qty').text()
 }]);
 
-linkParser.request('http://prolificinteractive.com').done(function (links) {
-  //Do stuff with links
+const getCartItems = jar => {
+  return requestAsync({
+    uri: 'https://shop.prolificinteractive.com/cart',
+    jar
+  }).then(parseCartItems);
+};
+
+// Assume we have a jar object...
+getCartItems(myJar).done(items => {
+  // Should return a list of cart items
 });
 ```
 
-is equivalent to:
+### Asynchronous Parsing
+
+You can also return promises from your parsers by using `parseAsync`. However, we recommend synchronous parsers, as they tend to be pure and more testable.
+
+An example:
 
 ```javascript
-linkParser.request('http://prolificinteractive.com', ['a[href]', {
-  'text': function ($a) {
-    return $a.text();
+'use strict';
+
+const bluebird = require('bluebird');
+const requestAsync = bluebird.promisify(require('request'));
+const { parseAsync } = require('html-to-json');
+
+const getCartItems = jar => {
+  return requestAsync({
+    uri: 'https://shop.prolificinteractive.com/cart',
+    jar
+  }).then(parseCartItems);
+};
+
+const getProductInfo = id => {
+  return requestAsync({
+    uri: `https://shop.prolificinteractive.com/products/${id}`
+  }).then(parseProductDetails);
+};
+
+const parseProductDetails = html => parse(html, {
+  'id': $doc => $doc.find('#product-id').text(),
+  'name': $doc => $doc.find('#product-name').text(),
+  'description': $doc => $doc.find('article#description').text().trim();
+});
+
+const parseCartItems = html => parse(html, ['#cart li', $li => {
+  const id = $li.attr('data-id');
+
+  return {
+    id,
+    'name': $li.find('.name').text(),
+    'quantity': +$li.find('.qty').text(),
+    'description': () => getProductInfo(id).get('description')
+  };
+}]);
+
+// Assume we have a jar object...
+getCartItems(myJar).done(items => {
+  // Should return a list of cart items with product descriptions
+});
+```
+
+## API
+
+### `parse`
+
+```javascript
+parse(
+  context, // HTML string or cheerio object
+  parser   // See the types below.
+) -> Any   // Returns any kind of value
+```
+
+#### Parser Types
+
+##### Parser Functions
+
+Functions may return a value or another parser, which allows you to cache values and use them within the closure.
+
+```javascript
+// Returning a value
+parse('<h1>Hello</h1>', $doc => {
+  return $doc.find('h1').text();
+}); // -> "Hello"
+
+// Returning an inner parser. Keeps the same parsing context.
+parse(`
+  <ul data-x="5">
+    <li>1</li>
+    <li>10</li>
+    <li>500</li>
+  </ul>
+`, $doc => {
+  const x = +$doc.find('ul').attr('data-x');
+  return ['li', $li => +$li.text() * x]; // Used as a parser array
+}); // -> [5, 50, 2500]
+```
+
+##### Parser Objects
+
+For objects, each property's value is used as a parser, and the result is stored against the same key:
+
+```javascript
+parse(`
+  <div id="foo">foo</div>
+  <div id="bar">bar</div>
+`, {
+  foo: $doc => {
+    return $doc.find('#foo').text();
   },
-  'href': function ($a) {
-    return $a.attr('href');
-  }
-}]).done(function (links) {
-  //Do stuff with links
-});
+  bar: $doc => {
+    return $doc.find('#bar').text();
+  },
+  one: 1,
+  divs: ['div', {
+    id: $div => $div.attr('id')
+  }]
+}); // -> { foo: "foo", bar: "bar", one: 1, divs: [{ id: "foo" }, { id: "bar" }] }
 ```
 
-The former allows you to easily reuse the filter (and make it testable), while that latter is a one-off.
+##### Parser Arrays
 
-### parser.parse(html, [callback])
-
-Parses the passed html argument against the parser's filter.
-
-### parser.method(html, [callback])
-
-Returns a method that wraps `parser.parse()`
-
-### parser.request(requestOptions, [callback])
-
-Makes a request with the request options, then runs the response body through the parser's filter.
-
-## Filter Types
-
-### Functions
-
-The return values of functions are mapped against their corresponding keys. Function filters are passed [cheerio](https://github.com/cheeriojs/cheerio) objects, which allows you to play with a jQuery-like interface.
+This library uses a shorthand syntax to map matched elements to values.
 
 ```javascript
-htmlToJson.parse('<div id="foo">foo</div>', {
-  'foo1': function ($doc, $) {
-    return $doc.find('#foo').text(); //foo
-  }
-}, callback);
+parse(`
+  <div class="product" data-product-id="1">
+    <div class="name">Product 1</div>
+  </div>
+  <div class="product" data-product-id="2">
+    <div class="name">Product 2</div>
+  </div>
+`, ['.product', {
+  id: $p => $p.attr('data-product-id'),
+  name: $p => $p.text()
+}]); // -> [{ id: "1", name: "Product 1" }, { id: "2", name: "Product 2"}]
 ```
 
-### Arrays
+##### Parser Constants
 
-Arrays of data can be parsed out by either using the .map() method within a filter function or using the shorthand [selector, filter] syntax:
-
-#### .map(selector, filter)
-
-A filter is applied incrementally against each matched element, and the results are returned within an array.
+Numbers, strings, and booleans are used as the result. This is, for instance, helpful for mocking out parsers.
 
 ```javascript
-var html = '<div id="items"><div class="item">1</div><div class="item">2</div></div>';
-
-htmlToJson.parse(html, function () {
-  return this.map('.item', function ($item) {
-    return $item.text();
-  });
-}).done(function (items) {
-  // Items should be: ['1','2']
-}, function (err) {
-  // Handle error
-});
+parse(`
+  <div class="product" data-product-id="1">
+    <div class="name">Product 1</div>
+  </div>
+  <div class="product" data-product-id="2">
+    <div class="name">Product 2</div>
+  </div>
+`, ['.product', {
+  id: $p => $p.attr('data-product-id'),
+  name: 'Mock Product'
+}]);  // -> [{ id: "1", name: "Mock Product" }, { id: "2", name: "Mock Product"}]
 ```
 
-#### [selector, filter, after]
-
-This is essentially a short-hand alias for `.map()`, making the filter look more like its output:
+### `parseAsync`
 
 ```javascript
-var html = '<div id="items"><div class="item">1</div><div class="item">2</div></div>';
-
-htmlToJson
-  .parse(html, ['.item', function ($item) {
-    return $item.text();
-  }])
-  .done(function (items) {
-    // Items should be: ['1','2']
-  }, function (err) {
-    // Handle error
-  });
+parseAsync(
+  context,  // HTML string or cheerio object
+  parser    // Same as parse(), but may return promises
+) -> Promise
 ```
 
-As an added convenience you can pass in a 3rd argument into the array filter, which allows you to manipulate the results. You can return a promise if you wish to do an asynchronous operation.
+### Parser Factories
+
+`html-to-json` also provides factories for common parsing functions:
 
 ```javascript
-var html = '<div id="items"><div class="item">1</div><div class="item">2</div></div>';
+const parseProducts = parse(html, ['.product', {
+  id: AttributeParser('data-product-id'),
+  name: StringParser('.name'),
+  price: NumberParser('.price')
+}]);
 
-htmlToJson
-  .parse(html, ['.item', function ($item) {
-    return +$item.text();
-  }, function (items) {
-    return _.map(items, function (item) {
-      return item * 3;
-    });
-  }])
-  .done(function (items) {
-    // Items should be: [3,6]
-  }, function (err) {
-    // Handle error
-  });
+parseProducts(`
+  <div class="product" data-product-id="1">
+    <div class="name">Product 1</div>
+    <div class="price">10.50</div>
+  </div>
+  <div class="product" data-product-id="2">
+    <div class="name">Product 2</div>
+    <div class="price">$30.00</div>
+  </div>
+`);  // -> [{ id: "1", name: "Product 1", price: 10.5 }, { id: "2", name: "Product 2", price: 30 }]
 ```
 
-### Asynchronous filters
+#### `StringParser`
 
-Filter functions may also return promises, which get resolved asynchronously.
+`StringParser([selector]) -> Function`
 
-```javascript
-function getProductDetails (id, callback) {
-  return htmlToJson.request({
-    uri: 'http://store.prolificinteractive.com/products/' + id
-  }, {
-    'id': function ($doc) {
-      return $doc.find('#product-details').attr('data-id');
-    },
-    'colors': ['.color', {
-      'id': function ($color) {
-        return $color.attr('data-id');
-      },
-      'hex': function ($color) {
-        return $color.css('background-color');
-      }
-    }]
-  }, callback);
-}
+Equivalent to `$el => $el.text().trim()`. If you pass a selector, it uses the first selected element, equivalent to `$el => $el.find(selector).eq(0).text().trim()`.
 
-function getProducts (callback) {
-  return htmlToJson.request({
-    uri: 'http://store.prolificinteractive.com'
-  }, ['.product', {
-    'id': function ($product) {
-      return $product.attr('data-id');
-    },
-    'image': function ($product) {
-      return $product.find('img').attr('src');
-    },
-    'colors': function ($product) {
-      // This is where we use a promise to get the colors asynchronously
-      return this
-        .get('id')
-        .then(function (id) {
-          return getProductDetails(id).get('colors');
-        });
-    }
-  }], callback);
-}
-```
+#### `NumberParser`
 
-### Dependencies on other values
+`NumberParser([selector]) -> Function`
 
-Filter functions may use the `.get(propertyName)` to use a value from another key in that filter. This returns a promise representing the value rather than the value itself.
+Extracts a number. If you pass a selector, it selects the first matching element and extracts a number from it.
 
-```javascript
-function getProducts (callback) {
-  return htmlToJson.request('http://store.prolificinteractive.com', ['.product', {
-    'id': function ($product) {
-      return $product.attr('data-id');
-    },
-    'image': function ($product) {
-      return $product.find('img').attr('src');
-    },
-    'colors': function ($product) {
-      // Resolve 'id' then get product details with it
-      return this
-        .get('id')
-        .then(function (id) {
-          return getProductDetails(id).get('colors');
-        });
-    }
-  }], callback);
-}
-```
+#### `AttributeParser`
 
-### Objects
+`AttributeParser(name, [selector]) -> Function`
 
-Nested objects within a filter are run against the same HTML context as the parent filter.
-
-```javascript
-var html = '<div id="foo"><div id="bar">foobar</div></div>';
-
-htmlToJson.parse(html, {
-  'foo': {
-    'bar': function ($doc) {
-      return $doc.find('#bar').text();
-    }
-  }
-});
-```
-
-#### $container modifier
-
-You may specify a more specific DOM context by setting the $container property on the object filter:
-
-```javascript
-var html = '<div id="foo"><div id="bar">foobar</div></div>';
-
-htmlToJson.parse(html, {
-  'foo': {
-    $container: '#foo',
-    'bar': function ($foo) {
-      return $foo.find('#bar').text();
-    }
-  }
-});
-```
-
-### Constants
-
-Strings, numbers, and null values are simply used as the filter's value. This especially comes in handy for incrementally converting from mock data to parsed data.
-
-```javascript
-htmlToJson.parse('<div id="nada"></div>', {
-  x: 1,
-  y: 'string value',
-  z: null
-});
-```
-
-## Contributing
-
-### Running Tests
-
-Tests are written in mocha and located in the `test` directory. Run them with:
-
-`npm test`
-
-This script also executes `jshint` against `lib/` and `test/` directories.
-
-### Style
-
-Please read the existing code in order to learn the conventions.
+Equivalent to `$el => $el.attr(name)`. If you pass a selector, it is equivalent to `$el => $el.find(selector).eq(0).attr(name)`.
